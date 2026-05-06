@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,6 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Enable CORS so your website can talk to this server without being blocked
+app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
@@ -73,7 +77,7 @@ app.post('/get-lyrics', async (req, res) => {
             model: "voxtral-mini-transcribe-v2"
         });
         
-        // 4. Cleanup the temporary file and send lyrics back to Sketchware!
+        // 4. Cleanup the temporary file and send lyrics back to your website!
         fs.unlinkSync(audioFilePath);
         res.json({ lyrics: response.text });
 
