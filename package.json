@@ -1,5 +1,5 @@
 {
-  "name": "mistral-lyrics",
+  "name": "ai-lyrics",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "express": "^4.19.0",
-    "youtube-dl-exec": "^3.0.0",
+    "play-dl": "^1.9.7",
     "@mistralai/mistralai": "^1.0.0"
   }
 }
