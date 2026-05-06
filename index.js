@@ -5,31 +5,30 @@ import fs from 'fs';
 import { Mistral } from '@mistralai/mistralai';
 
 const app = express();
-const upload = multer({ dest: 'uploads/' }); // Files will be saved here temporarily
+const upload = multer({ dest: 'uploads/' }); // Temporary folder for incoming audio
 
 app.use(cors());
 app.use(express.json());
 
 app.post('/get-lyrics', upload.single('audio'), async (req, res) => {
+    const filePath = req.file?.path;
     try {
         const apiKey = process.env.MISTRAL_API_KEY;
         const client = new Mistral({ apiKey: apiKey });
 
-        if (!req.file) return res.status(400).json({ error: "No audio file uploaded." });
+        if (!req.file) throw new Error("No audio file received from phone.");
 
-        // Send the file directly from the 'uploads' folder to Mistral
+        // Hand the file directly to Mistral
         const response = await client.audio.transcriptions.complete({
-            file: fs.createReadStream(req.file.path),
+            file: fs.createReadStream(filePath),
             model: "voxtral-mini-transcribe-v2"
         });
 
-        // Cleanup: Delete the file after processing
-        fs.unlinkSync(req.file.path);
-
+        fs.unlinkSync(filePath); // Delete temp file
         res.json({ lyrics: response.text });
 
     } catch (e) {
-        if (req.file) fs.unlinkSync(req.file.path);
+        if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
         res.status(500).json({ error: e.message });
     }
 });
