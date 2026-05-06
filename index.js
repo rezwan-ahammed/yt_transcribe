@@ -10,21 +10,28 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Enable CORS so your website can talk to this server without being blocked
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Helper function to extract just the 11-character Video ID from the link
 function extractVideoId(url) {
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
     const match = url.match(regex);
     return match ? match[1] : null;
 }
 
+// A list of the most reliable public Piped instances
+const PIPED_INSTANCES = [
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.tokhmi.xyz",
+    "https://pipedapi.syncpundit.io",
+    "https://pipedapi.smnz.de",
+    "https://piped-api.lunar.icu",
+    "https://pipedapi.adminforge.de"
+];
+
 app.post('/get-lyrics', async (req, res) => {
-    // Generate a unique filename for the incoming request
     const audioFilePath = path.join(__dirname, `temp_${Date.now()}.m4a`);
 
     try {
@@ -45,25 +52,36 @@ app.post('/get-lyrics', async (req, res) => {
             return res.status(400).json({ error: "Invalid YouTube URL format." });
         }
 
-        // 1. Ask the Piped Proxy API for the unblocked audio streams
-        const pipedRes = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
-        if (!pipedRes.ok) {
-            throw new Error("Could not fetch bypass stream. The proxy might be busy.");
-        }
-        
-        const streamData = await pipedRes.json();
-        
-        if (!streamData.audioStreams || streamData.audioStreams.length === 0) {
-            throw new Error("No audio streams found for this video.");
+        let audioUrl = null;
+
+        // 1. Proxy Fallback Loop: Try servers until one successfully returns the audio
+        for (const proxy of PIPED_INSTANCES) {
+            try {
+                const pipedRes = await fetch(`${proxy}/streams/${videoId}`);
+                if (pipedRes.ok) {
+                    const streamData = await pipedRes.json();
+                    if (streamData.audioStreams && streamData.audioStreams.length > 0) {
+                        // Success! We found a working proxy. Grab the URL and stop searching.
+                        audioUrl = streamData.audioStreams[0].url;
+                        console.log(`Successfully connected via: ${proxy}`);
+                        break; 
+                    }
+                }
+            } catch (err) {
+                // If this proxy fails or is busy, silently move to the next one
+                continue; 
+            }
         }
 
-        // Extract the best, unblocked audio stream URL
-        const audioUrl = streamData.audioStreams[0].url;
+        // If it looped through all 6 proxies and failed, throw an error
+        if (!audioUrl) {
+            throw new Error("All global proxy servers are currently busy. Please try again in 60 seconds.");
+        }
 
-        // 2. Download the audio file into memory, then save to disk
+        // 2. Download the audio file into memory
         const audioStreamRes = await fetch(audioUrl);
         if (!audioStreamRes.ok) {
-            throw new Error("Failed to download audio file from proxy.");
+            throw new Error("Failed to download audio file from the selected proxy.");
         }
 
         const arrayBuffer = await audioStreamRes.arrayBuffer();
@@ -77,7 +95,7 @@ app.post('/get-lyrics', async (req, res) => {
             model: "voxtral-mini-transcribe-v2"
         });
         
-        // 4. Cleanup the temporary file and send lyrics back to your website!
+        // 4. Cleanup and send lyrics
         fs.unlinkSync(audioFilePath);
         res.json({ lyrics: response.text });
 
