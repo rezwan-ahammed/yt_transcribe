@@ -1,0 +1,14 @@
+{
+  "name": "mistral-lyrics",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.0",
+    "@distube/ytdl-core": "^4.14.4",
+    "@mistralai/mistralai": "^1.0.0"
+  }
+}
